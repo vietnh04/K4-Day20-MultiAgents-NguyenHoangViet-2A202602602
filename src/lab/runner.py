@@ -89,6 +89,10 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
 
     try:
         prepare_sandbox(task, sandbox, skills_dir)
+        # Local test runs leave __pycache__/.pytest_cache in tasks/*/workspace (git-ignored). Their bytecode
+        # points at the lab repo, so pytest in the sandbox would show repo paths and "???" instead of source.
+        for cache in [*sandbox.rglob("__pycache__"), *sandbox.rglob(".pytest_cache")]:
+            shutil.rmtree(cache, ignore_errors=True)
         skills_before = hash_dir(sandbox / "skills")
         record["skills_sha256"] = skills_before
 
@@ -99,16 +103,18 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
         messages = []
         final = ""
         try:
-            result = agent.invoke(
+            # Stream so the messages collected up to a failure (e.g. recursion limit) are kept,
+            # giving a usable trace even when the run does not finish cleanly (pseudocode step 8).
+            for chunk in agent.stream(
                 {"messages": [{"role": "user", "content": task.instruction}]},
                 config={"callbacks": [usage], "recursion_limit": recursion_limit},
-            )
-            messages = result["messages"]
+                stream_mode="values",
+            ):
+                messages = chunk.get("messages", messages)
             final = messages[-1].content if messages else ""
         except Exception as exc:  # noqa: BLE001  - errors must be recorded, not raised
             record["error"] = f"{type(exc).__name__}: {exc}"
-            messages = []
-            final = ""
+            final = messages[-1].content if messages else ""
 
         record["seconds"] = round(time.time() - t0, 1)
 

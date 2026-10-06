@@ -6,3 +6,5 @@ __pycache__/
 *.egg-info/
 # Tài liệu và mã dành cho giảng viên (đáp án, bản cài đặt tham chiếu, bộ sinh dữ liệu). Chỉ giữ cục bộ.
 instructor/
+# Vết của các lần chạy trước khi shell bị cô lập (chứa nội dung tệp ngoài sandbox). Không commit.
+results-extra/
